@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Você foi convocado — Synapse Volt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Metal+Mania&family=Special+Elite&family=Oswald:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#020103;
+    --bg2:#05030a;
+    --purple-deep:#0d0619;
+    --purple-bright:#a568ff;
+    --lightning:#eaf3ff;
+    --lightning-core:#ffffff;
+    --glass-bg:rgba(18,10,32,.42);
+    --glass-border:rgba(165,104,255,.45);
+    --muted:#9d8fc2;
+    --danger:#ff5a6e;
+    --ok:#7ef7b0;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:var(--bg); color:var(--lightning);
+    font-family:'Special Elite','Courier New',monospace;
+    overflow-x:hidden; min-height:100vh;
+  }
+  .brush{font-family:'Metal Mania',cursive; letter-spacing:1px;}
+  .label{font-family:'Oswald',sans-serif; letter-spacing:3px; text-transform:uppercase;}
+
+  #lightning-canvas{
+    position:fixed; inset:0; width:100vw; height:100vh; z-index:0; pointer-events:none;
+    background:radial-gradient(ellipse at 50% 15%, var(--purple-deep) 0%, var(--bg2) 45%, var(--bg) 100%);
+  }
+  #flash{ position:fixed; inset:0; z-index:1; pointer-events:none; background:var(--lightning-core); opacity:0; mix-blend-mode:screen;}
+
+  main{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center;
+    padding:9vh 6vw 8vh; min-height:100vh; text-align:center;}
+
+  .badge{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid var(--purple-bright); border-radius:30px; padding:6px 16px;
+    font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:3px; color:var(--muted);
+    margin-bottom:22px;
+  }
+
+  #hero-img{
+    width:min(60vw, 220px); border-radius:14px; margin-bottom:24px;
+    box-shadow:0 0 34px rgba(165,104,255,.55), 0 20px 50px rgba(0,0,0,.6);
+    border:1px solid rgba(165,104,255,.4);
+    display:none;
+  }
+  #hero-img.show{display:block;}
+
+  h1.brush{ font-size:clamp(2.1rem,7vw,3.6rem); line-height:1.02; color:var(--lightning-core);
+    text-shadow:0 0 18px var(--purple-bright), 0 0 40px rgba(165,104,255,.5); max-width:16ch;}
+  p.quote{ color:var(--muted); font-size:.95rem; max-width:36ch; margin-top:14px;}
+
+  /* ---------- shared glass card ---------- */
+  .glass-card{
+    margin-top:36px; width:min(94vw,480px);
+    background:var(--glass-bg); -webkit-backdrop-filter:blur(18px) saturate(150%); backdrop-filter:blur(18px) saturate(150%);
+    border:1px solid var(--glass-border); border-radius:16px; padding:30px 26px;
+    box-shadow:0 0 40px rgba(165,104,255,.22), 0 20px 50px rgba(0,0,0,.5);
+    text-align:left; position:relative; transition:transform .25s ease;
+  }
+  .glass-card.shake{ animation:shake .45s ease; }
+  @keyframes shake{
+    10%,90%{transform:translateX(-2px);}
+    20%,80%{transform:translateX(4px);}
+    30%,50%,70%{transform:translateX(-8px);}
+    40%,60%{transform:translateX(8px);}
+  }
+
+  /* ---------- gate (phone check) ---------- */
+  #gate-card h3.brush{ font-size:1.5rem; color:var(--lightning-core); text-shadow:0 0 16px var(--purple-bright); margin-bottom:4px;}
+  #gate-card .sub{ color:var(--muted); font-size:.85rem; margin-bottom:22px;}
+
+  .field{ margin-bottom:18px; }
+  .field label.title{
+    display:block; font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--purple-bright); margin-bottom:8px;
+  }
+  .field input[type="text"], .field input[type="tel"]{
+    width:100%; padding:13px 14px; border-radius:8px; border:1px solid rgba(165,104,255,.4);
+    background:rgba(5,2,8,.4); color:var(--lightning); font-family:'Special Elite',monospace; font-size:1rem;
+    outline:none; transition:border-color .2s, box-shadow .2s;
+  }
+  .field input::placeholder{ color:rgba(157,143,194,.6);}
+  .field input:focus{ border-color:var(--purple-bright); box-shadow:0 0 0 3px rgba(165,104,255,.18);}
+  .field small.hint{ display:block; margin-top:6px; color:var(--muted); font-size:.78rem;}
+
+  .btn-primary{
+    width:100%; margin-top:4px; padding:15px; border:none; border-radius:8px;
+    background:var(--purple-bright); color:#0a0512; font-family:'Oswald',sans-serif;
+    font-weight:600; letter-spacing:3px; font-size:12px; cursor:pointer;
+    transition:filter .3s, transform .2s;
+  }
+  .btn-primary:hover{ filter:brightness(1.1); transform:translateY(-1px);}
+  .btn-primary:disabled{ opacity:.6; cursor:wait; transform:none;}
+
+  #gate-error{
+    display:none; margin-top:16px; padding:13px 14px; border-radius:8px;
+    background:rgba(255,90,110,.12); border:1px solid rgba(255,90,110,.5);
+    color:var(--danger); font-size:.88rem; line-height:1.4;
+  }
+  #gate-error .big{ font-family:'Oswald',sans-serif; letter-spacing:2px; font-size:.78rem; display:block; margin-bottom:4px;}
+
+  /* ---------- guest area ---------- */
+  #guest-area{ display:none; width:100%; flex-direction:column; align-items:center;}
+  #guest-area.show{ display:flex; }
+  #gate-screen.hidden{ display:none; }
+
+  #welcome{ margin-top:6px; }
+  #welcome .eyebrow{ font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:3px; color:var(--purple-bright);}
+  #welcome h2.brush{ font-size:clamp(1.6rem,5vw,2.3rem); color:var(--lightning-core); text-shadow:0 0 18px var(--purple-bright); margin-top:2px;}
+
+  #recap{ text-align:left; }
+  #recap .intro{ color:var(--muted); font-size:.88rem; line-height:1.5; margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid rgba(165,104,255,.16);}
+  #recap .row{ display:flex; gap:14px; padding:12px 0; border-bottom:1px solid rgba(165,104,255,.16);}
+  #recap .row:last-child{border-bottom:none;}
+  #recap .row .ico{font-size:1.2rem; width:26px; text-align:center; flex-shrink:0;}
+  #recap .row .txt b{ display:block; font-family:'Oswald',sans-serif; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--purple-bright); margin-bottom:3px;}
+  #recap .row .txt span{font-size:.92rem; line-height:1.4;}
+  #recap .row .txt small{display:block; margin-top:2px; color:var(--muted); font-size:.8rem;}
+
+  #rsvp-card h3.brush{ font-size:1.4rem; color:var(--lightning-core); text-shadow:0 0 16px var(--purple-bright); margin-bottom:4px;}
+  #rsvp-card .sub{ color:var(--muted); font-size:.85rem; margin-bottom:20px;}
+
+  #already-note{
+    display:none; margin-bottom:18px; padding:11px 14px; border-radius:8px;
+    background:rgba(165,104,255,.1); border:1px solid rgba(165,104,255,.35);
+    font-size:.85rem; color:var(--lightning);
+  }
+  #already-note.show{display:block;}
+
+  .radio-group{ display:flex; gap:10px; flex-wrap:wrap;}
+  .radio-opt{ flex:1; min-width:140px; position:relative;}
+  .radio-opt input{ position:absolute; opacity:0; inset:0; cursor:pointer;}
+  .radio-opt span{
+    display:block; text-align:center; padding:13px 10px; border-radius:8px;
+    border:1px solid rgba(165,104,255,.4); background:rgba(5,2,8,.35);
+    font-family:'Oswald',sans-serif; font-size:12px; letter-spacing:1px; color:var(--lightning);
+    transition:background .2s, border-color .2s, box-shadow .2s;
+  }
+  .radio-opt input:checked + span{
+    background:rgba(165,104,255,.25); border-color:var(--purple-bright);
+    box-shadow:0 0 14px rgba(165,104,255,.4); color:var(--lightning-core);
+  }
+
+  /* ---------- bloco condicional do +1 ---------- */
+  #plus1-fields{
+    display:none; margin-top:6px; padding-top:16px; border-top:1px dashed rgba(165,104,255,.3);
+  }
+  #plus1-fields.show{ display:block; }
+  #plus1-note{
+    margin-top:14px; padding:11px 13px; border-radius:8px;
+    background:rgba(165,104,255,.08); border:1px solid rgba(165,104,255,.3);
+    color:var(--muted); font-size:.8rem; line-height:1.45;
+  }
+
+  #rsvp-status{ font-size:.85rem; margin-top:12px; display:none; }
+  #rsvp-status.ok{ color:var(--ok); display:block; }
+  #rsvp-status.err{ color:var(--danger); display:block; }
+
+  @media (max-width:480px){
+    .glass-card{ padding:24px 18px;}
+    .radio-opt{min-width:100%;}
+  }
+</style>
+</head>
+<body>
+
+<canvas id="lightning-canvas"></canvas>
+<div id="flash"></div>
+
+<main>
+  <div class="badge">⚡ HALLOWEEN ELÉTRICO 31/10 ⚡</div>
+  <img id="hero-img" alt="Synapse Volt, o Condutor da Tempestade">
+  <h1 class="brush">Você foi convocado<br>para a tempestade.</h1>
+  <p class="quote">"Ele não precisa de corpo, porque é feito de onda e luz."</p>
+
+  <!-- ===================== TELA 1: PORTA DE ENTRADA ===================== -->
+  <div id="gate-screen">
+    <div class="glass-card" id="gate-card">
+      <h3 class="brush">Confirme quem você é</h3>
+      <p class="sub">Digite o telefone cadastrado.</p>
+
+      <form id="gate-form" onsubmit="return false;">
+        <div class="field">
+          <label class="title" for="telefone">Seu telefone</label>
+          <input type="tel" id="telefone" name="telefone" placeholder="(11) 91234-5678" inputmode="tel" autocomplete="tel" required>
+          <small class="hint">Com ou sem DDD, com ou sem +55 — tanto faz.</small>
+        </div>
+        <button type="submit" class="btn-primary" id="gate-btn">ACESSAR CONVITE</button>
+      </form>
+
+      <div id="gate-error">
+        <span class="big">⚡ ACESSO NEGADO</span>
+        Esse número não está na lista dessa tempestade. Confira o telefone e tente de novo.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== TELA 2: ÁREA DO CONVIDADO ===================== -->
+  <div id="guest-area">
+    <div id="welcome">
+      <div class="eyebrow">VOCÊ ESTÁ DENTRO</div>
+      <h2 class="brush" id="welcome-name">Bem-vindo(a)!</h2>
+    </div>
+
+    <div class="glass-card" id="recap">
+      <p class="intro">Esse é o convite oficial para a festa de Halloween de 2026. Confirme abaixo alguns detalhes com a gente antes da tempestade chegar:</p>
+      <div class="row">
+        <div class="ico">🗓️</div>
+        <div class="txt"><b>Quando</b><span>31/10/2026, a partir das 16h</span></div>
+      </div>
+      <div class="row">
+        <div class="ico">🔊</div>
+        <div class="txt"><b>O ritmo da festa</b><span>Música alta até às 22h</span><small>Depois disso, som mais baixo pela madrugada — para quem ainda não quer ir embora.</small></div>
+      </div>
+      <div class="row">
+        <div class="ico">📍</div>
+        <div class="txt"><b>Onde</b><span>Condomínio A Reserva - Salão Gourmet</span></div>
+      </div>
+      <div class="row">
+        <div class="ico">🍸</div>
+        <div class="txt"><b>O que levar</b><span>Sua própria bebida, para compartilhar com a galera</span></div>
+      </div>
+      <div class="row">
+        <div class="ico">🎭</div>
+        <div class="txt"><b>Fantasia</b><span>Obrigatória</span></div>
+      </div>
+    </div>
+
+    <div class="glass-card" id="rsvp-card">
+      <h3 class="brush">Confirme sua presença</h3>
+      <p class="sub" id="rsvp-sub">Responda rapidinho</p>
+      <div id="already-note">✏️ Você já respondeu antes — veja sua resposta abaixo e altere se quiser.</div>
+
+      <form id="rsvp-form" onsubmit="return false;">
+        <div class="field">
+          <label class="title">Você confirma presença?</label>
+          <div class="radio-group">
+            <label class="radio-opt">
+              <input type="radio" name="confirmado" value="Sim, vou!" required>
+              <span>⚡ Sim, vou!</span>
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="confirmado" value="Não vou poder">
+              <span>Não vou poder</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="title" for="restricao">Alguma restrição alimentar?</label>
+          <input type="text" id="restricao" name="restricao" placeholder="Ex: vegetariano, sem glúten... deixe em branco se não tiver">
+        </div>
+
+        <div class="field">
+          <label class="title">Vai levar +1?</label>
+          <div class="radio-group">
+            <label class="radio-opt">
+              <input type="radio" name="levaPlus1" value="Sim">
+              <span>Sim</span>
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="levaPlus1" value="Não">
+              <span>Não</span>
+            </label>
+          </div>
+
+          <div id="plus1-fields">
+            <div class="field">
+              <label class="title" for="plus1Nome">Nome do seu +1</label>
+              <input type="text" id="plus1Nome" name="plus1Nome" placeholder="Nome completo">
+            </div>
+            <div class="field" style="margin-bottom:0;">
+              <label class="title" for="plus1Restricao">Restrição alimentar do +1</label>
+              <input type="text" id="plus1Restricao" name="plus1Restricao" placeholder="Deixe em branco se não tiver">
+            </div>
+            <div id="plus1-note">👻 Se você quiser convidar mais gente além do seu +1, fala com o Math ou a Nath pra gente organizar certinho.</div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submit-btn">SALVAR CONFIRMAÇÃO</button>
+        <div id="rsvp-status"></div>
+      </form>
+    </div>
+  </div>
+</main>
+
+<script>
+  /* ====== CONFIG ======
+     Cole aqui a URL do seu Apps Script implantado (a que termina em
+     /exec). É com ela que esta página conversa por trás dos panos —
+     o convidado nunca abre esse link diretamente, então o bug do
+     Android que intercepta script.google.com pelo app do Drive não
+     acontece mais.
+  */
+  const API_URL = "https://script.google.com/macros/s/AKfycbzWZUG_-HD3N8o9-dDudstbJvldDSQ9UMXR657XJcVHR-J58uxquIqkjy2LVQw9dc8w0A/exec";
+
+  /* Cole aqui a URL "raw" do GitHub ou o link público com a imagem do
+     Synapse Volt, se quiser mostrá-la no topo do convite. Deixe vazio
+     para não mostrar imagem. */
+  const IMAGEM_URL = ""; // ex: "https://raw.githubusercontent.com/usuario/repo/main/synapse_volt_art.png"
+  if(IMAGEM_URL){
+    const img = document.getElementById('hero-img');
+    img.src = IMAGEM_URL;
+    img.classList.add('show');
+  }
+
+  /* ====== raios de fundo (discretos) ====== */
+  const canvas = document.getElementById('lightning-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H;
+  function resize(){ W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function drawBolt(x0,y0,angleBase,len,generation,alpha){
+    if(generation<=0) return;
+    let x=x0, y=y0;
+    ctx.beginPath(); ctx.moveTo(x,y);
+    const segments = 6 + Math.floor(Math.random()*5);
+    for(let i=0;i<segments;i++){
+      const angle = angleBase + (Math.random()-0.5)*0.9;
+      const step = len/segments * (0.7+Math.random()*0.6);
+      x += Math.cos(angle)*step; y += Math.sin(angle)*step;
+      ctx.lineTo(x,y);
+      if(Math.random()<0.25 && generation>1){
+        drawBolt(x,y, angle + (Math.random()>0.5?1:-1)*0.9, len*0.45, generation-1, alpha*0.6);
+      }
+    }
+    ctx.strokeStyle = `rgba(234,243,255,${alpha})`;
+    ctx.lineWidth = 1.2 + generation*0.4;
+    ctx.shadowColor = '#a568ff'; ctx.shadowBlur = 16 + generation*3;
+    ctx.stroke();
+  }
+
+  const flashEl = document.getElementById('flash');
+  function flashScreen(peak, color){
+    flashEl.style.background = color || 'var(--lightning-core)';
+    flashEl.style.transition='none'; flashEl.style.opacity=peak;
+    requestAnimationFrame(()=>{ flashEl.style.transition='opacity .3s ease-out'; flashEl.style.opacity=0; });
+  }
+
+  let lastFrame = 0;
+  function loop(t){
+    requestAnimationFrame(loop);
+    if(t-lastFrame < 40) return;
+    lastFrame = t;
+    ctx.fillStyle = 'rgba(5,2,8,0.3)';
+    ctx.fillRect(0,0,W,H);
+    if(Math.random() < 0.02){
+      const x0 = Math.random()*W;
+      drawBolt(x0,0, Math.PI/2 + (Math.random()-0.5)*0.6, H*0.5, 3, 0.4);
+      if(Math.random()<0.3) flashScreen(0.06);
+    }
+  }
+  requestAnimationFrame(loop);
+
+  /* ====== estado ====== */
+  let telefoneConvidado = '';
+
+  /* ====== porta de entrada (verificação de telefone) ====== */
+  const gateForm = document.getElementById('gate-form');
+  const gateBtn = document.getElementById('gate-btn');
+  const gateCard = document.getElementById('gate-card');
+  const gateError = document.getElementById('gate-error');
+  const gateScreen = document.getElementById('gate-screen');
+  const guestArea = document.getElementById('guest-area');
+  const welcomeName = document.getElementById('welcome-name');
+  const alreadyNote = document.getElementById('already-note');
+  const rsvpSub = document.getElementById('rsvp-sub');
+
+  gateForm.addEventListener('submit', async function(e){
+    e.preventDefault();
+    gateError.style.display = 'none';
+    gateBtn.disabled = true;
+    gateBtn.textContent = 'VERIFICANDO...';
+
+    const telefoneDigitado = document.getElementById('telefone').value;
+
+    try {
+      const url = API_URL + '?action=verificar&telefone=' + encodeURIComponent(telefoneDigitado);
+      const resp = await fetch(url);
+      const res = await resp.json();
+      onGateResult(res, telefoneDigitado);
+    } catch (err) {
+      onGateError(err);
+    }
+  });
+
+  function onGateResult(res, telefoneDigitado){
+    gateBtn.disabled = false;
+    gateBtn.textContent = 'ACESSAR CONVITE';
+
+    if(res && res.autorizado){
+      telefoneConvidado = telefoneDigitado;
+      const nome = res.nome || '';
+      welcomeName.textContent = nome ? ('Bem-vindo(a), ' + nome + '!') : 'Bem-vindo(a)!';
+
+      // pré-preenche com a resposta já salva, se houver
+      if(res.confirmado){
+        const radio = document.querySelector('input[name="confirmado"][value="' + CSS.escape(res.confirmado) + '"]');
+        if(radio) radio.checked = true;
+        alreadyNote.classList.add('show');
+        rsvpSub.textContent = 'Sua resposta atual está abaixo.';
+      }
+      if(res.restricao){
+        document.getElementById('restricao').value = res.restricao;
+      }
+
+      // pré-preenche o +1, se houver
+      if(res.plus1Nome){
+        const levaPlus1Radio = document.querySelector('input[name="levaPlus1"][value="Sim"]');
+        if(levaPlus1Radio){ levaPlus1Radio.checked = true; }
+        document.getElementById('plus1Nome').value = res.plus1Nome;
+        if(res.plus1Restricao){
+          document.getElementById('plus1Restricao').value = res.plus1Restricao;
+        }
+        togglePlus1Fields();
+      }
+
+      gateScreen.classList.add('hidden');
+      guestArea.classList.add('show');
+      flashScreen(0.5);
+      window.scrollTo({top:0, behavior:'smooth'});
+    } else {
+      gateError.style.display = 'block';
+      gateCard.classList.remove('shake');
+      void gateCard.offsetWidth; // reinicia a animação
+      gateCard.classList.add('shake');
+      flashScreen(0.25, '#ff5a6e');
+    }
+  }
+
+  function onGateError(err){
+    gateBtn.disabled = false;
+    gateBtn.textContent = 'ACESSAR CONVITE';
+    gateError.querySelector('.big').nextSibling.textContent =
+      ' Não deu pra verificar agora. Tente de novo em instantes.';
+    gateError.style.display = 'block';
+  }
+
+  /* ====== mostra/esconde os campos do +1 ====== */
+  const plus1Fields = document.getElementById('plus1-fields');
+  function togglePlus1Fields(){
+    const selecionado = document.querySelector('input[name="levaPlus1"]:checked');
+    if(selecionado && selecionado.value === 'Sim'){
+      plus1Fields.classList.add('show');
+    } else {
+      plus1Fields.classList.remove('show');
+    }
+  }
+  document.querySelectorAll('input[name="levaPlus1"]').forEach(function(radio){
+    radio.addEventListener('change', togglePlus1Fields);
+  });
+
+  /* ====== salvar / atualizar o RSVP ====== */
+  const form = document.getElementById('rsvp-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const rsvpStatus = document.getElementById('rsvp-status');
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    rsvpStatus.className = '';
+    rsvpStatus.textContent = '';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'SALVANDO...';
+
+    const confirmadoInput = form.querySelector('input[name="confirmado"]:checked');
+    const levaPlus1Input = form.querySelector('input[name="levaPlus1"]:checked');
+    const dados = {
+      telefone: telefoneConvidado,
+      confirmado: confirmadoInput ? confirmadoInput.value : '',
+      restricao: document.getElementById('restricao').value,
+      levaPlus1: levaPlus1Input ? levaPlus1Input.value : '',
+      plus1Nome: document.getElementById('plus1Nome').value,
+      plus1Restricao: document.getElementById('plus1Restricao').value
+    };
+
+    try {
+      // Content-Type text/plain evita um "preflight" OPTIONS, que o
+      // Apps Script não sabe responder. O backend faz JSON.parse do
+      // corpo mesmo assim.
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(dados)
+      });
+      const res = await resp.json();
+      if(res && res.error){
+        onRsvpError({ message: res.error });
+      } else {
+        onSuccess();
+      }
+    } catch (err) {
+      onRsvpError(err);
+    }
+  });
+
+  function onSuccess(){
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'SALVAR CONFIRMAÇÃO';
+    rsvpStatus.className = 'ok';
+    rsvpStatus.textContent = '✓ Resposta salva! Você pode voltar aqui e mudar quando quiser.';
+    alreadyNote.classList.add('show');
+    rsvpSub.textContent = 'Sua resposta atual está abaixo.';
+  }
+  function onRsvpError(err){
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'SALVAR CONFIRMAÇÃO';
+    rsvpStatus.className = 'err';
+    rsvpStatus.textContent = (err && err.message) ? err.message : 'Algo deu errado. Tente novamente.';
+  }
+</script>
+
+</body>
+</html>
