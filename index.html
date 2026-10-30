@@ -351,13 +351,13 @@
     <!-- ===== Concurso de melhor fantasia ===== -->
     <div class="glass-card" id="photo-card">
       <h3 class="brush">📸 Melhor fantasia</h3>
-      <p class="sub">Mostre sua fantasia! Envie uma ou mais fotos para a votação de melhor fantasia da noite.</p>
-      <div class="privacy">🔒 Só você vê as fotos que enviar aqui. Pode apagar e subir outra quando quiser.</div>
+      <p class="sub">Mostre sua fantasia! Envie uma foto para a votação de melhor fantasia da noite.</p>
+      <div class="privacy">🔒 Só você vê a foto que enviar aqui. Pode apagar e subir outra quando quiser.</div>
 
-      <div id="photo-counter">0 de 5 fotos</div>
+      <div id="photo-counter">0 de 1 foto</div>
 
-      <label class="btn-upload" id="photo-upload-btn" for="photo-input">📷 ESCOLHER FOTOS</label>
-      <input type="file" id="photo-input" accept="image/*" multiple>
+      <label class="btn-upload" id="photo-upload-btn" for="photo-input">📷 ESCOLHER FOTO</label>
+      <input type="file" id="photo-input" accept="image/*">
 
       <div id="photo-status" class="info"></div>
       <div id="photo-empty" style="display:none;">Você ainda não enviou nenhuma foto.</div>
@@ -612,7 +612,7 @@
   const lightbox = document.getElementById('lightbox');
 
   let fotos = [];        // [{ id, dataUrl }]
-  let maxFotos = 5;      // o servidor confirma o limite real
+  let maxFotos = 1;      // o servidor confirma o limite real
   let fotoOcupado = false;
 
   function setPhotoStatus(texto, tipo){
@@ -648,7 +648,7 @@
       photoGrid.appendChild(item);
     });
 
-    photoCounter.textContent = fotos.length + ' de ' + maxFotos + ' fotos';
+    photoCounter.textContent = fotos.length + ' de ' + maxFotos + (maxFotos === 1 ? ' foto' : ' fotos');
     photoEmpty.style.display = fotos.length ? 'none' : 'block';
     const cheio = fotos.length >= maxFotos;
     photoUploadBtn.classList.toggle('disabled', cheio || fotoOcupado);
@@ -658,7 +658,7 @@
   lightbox.addEventListener('click', function(){ lightbox.classList.remove('show'); });
 
   async function carregarFotos(){
-    setPhotoStatus('Carregando suas fotos...', 'info');
+    setPhotoStatus('Carregando sua foto...', 'info');
     try {
       const url = API_URL + '?action=fotos&telefone=' + encodeURIComponent(telefoneConvidado);
       const resp = await fetch(url);
@@ -670,7 +670,7 @@
       setPhotoStatus('', 'info');
     } catch (err) {
       renderFotos();
-      setPhotoStatus('Não deu pra carregar suas fotos agora. Recarregue a página para tentar de novo.', 'err');
+      setPhotoStatus('Não deu pra carregar sua foto agora. Recarregue a página para tentar de novo.', 'err');
     }
   }
 
@@ -704,7 +704,7 @@
 
     const vagas = maxFotos - fotos.length;
     if(vagas <= 0){
-      setPhotoStatus('Você já enviou o máximo de ' + maxFotos + ' fotos. Apague uma para enviar outra.', 'err');
+      setPhotoStatus('Você já enviou sua foto. Apague a atual para enviar outra.', 'err');
       return;
     }
     const selecionados = arquivos.slice(0, vagas);
@@ -742,7 +742,7 @@
       setPhotoStatus((enviadas ? enviadas + ' foto(s) enviada(s). ' : '') + erro, 'err');
     } else {
       let msg = '✓ ' + enviadas + (enviadas === 1 ? ' foto enviada!' : ' fotos enviadas!');
-      if(cortadas > 0) msg += ' (O limite é ' + maxFotos + ' fotos, então ' + cortadas + ' ficou de fora.)';
+      if(cortadas > 0) msg += ' (O limite é de 1 foto por pessoa.)';
       setPhotoStatus(msg, 'ok');
     }
   });
