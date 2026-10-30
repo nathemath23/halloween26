@@ -165,6 +165,63 @@
   #rsvp-status.ok{ color:var(--ok); display:block; }
   #rsvp-status.err{ color:var(--danger); display:block; }
 
+  /* ---------- concurso de fantasia (fotos) ---------- */
+  #photo-card h3.brush{ font-size:1.4rem; color:var(--lightning-core); text-shadow:0 0 16px var(--purple-bright); margin-bottom:4px;}
+  #photo-card .sub{ color:var(--muted); font-size:.85rem; line-height:1.5; margin-bottom:16px;}
+  #photo-card .privacy{
+    padding:10px 13px; border-radius:8px; margin-bottom:16px;
+    background:rgba(165,104,255,.08); border:1px solid rgba(165,104,255,.3);
+    color:var(--muted); font-size:.78rem; line-height:1.45;
+  }
+  #photo-counter{
+    font-family:'Oswald',sans-serif; font-size:11px; letter-spacing:2px; text-transform:uppercase;
+    color:var(--purple-bright); margin-bottom:10px;
+  }
+  .btn-upload{
+    display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+    padding:14px; border-radius:8px; cursor:pointer;
+    border:1.5px dashed var(--purple-bright); background:rgba(165,104,255,.08);
+    font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:2px; font-size:12px; color:var(--lightning-core);
+    transition:background .2s, box-shadow .2s, transform .2s;
+  }
+  .btn-upload:hover{ background:rgba(165,104,255,.18); box-shadow:0 0 18px rgba(165,104,255,.35); transform:translateY(-1px);}
+  .btn-upload.disabled{ opacity:.5; cursor:not-allowed; transform:none; box-shadow:none;}
+  #photo-input{ display:none; }
+
+  #photo-grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px; margin-top:16px;
+  }
+  .photo-item{
+    position:relative; border-radius:10px; overflow:hidden; aspect-ratio:3/4;
+    border:1px solid rgba(165,104,255,.4); background:rgba(5,2,8,.5);
+    box-shadow:0 0 16px rgba(165,104,255,.2);
+  }
+  .photo-item img{ width:100%; height:100%; object-fit:cover; display:block; cursor:zoom-in; }
+  .photo-del{
+    position:absolute; top:6px; right:6px; width:30px; height:30px; border-radius:50%;
+    border:1px solid rgba(255,90,110,.7); background:rgba(10,4,16,.8); color:var(--danger);
+    font-size:15px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .2s, transform .2s;
+  }
+  .photo-del:hover{ background:rgba(255,90,110,.25); transform:scale(1.08);}
+  .photo-item.busy{ opacity:.45; pointer-events:none; }
+  #photo-empty{
+    margin-top:16px; padding:18px; text-align:center; border-radius:10px;
+    border:1px dashed rgba(165,104,255,.3); color:var(--muted); font-size:.85rem;
+  }
+  #photo-status{ font-size:.85rem; margin-top:12px; min-height:1em; }
+  #photo-status.ok{ color:var(--ok); }
+  #photo-status.err{ color:var(--danger); }
+  #photo-status.info{ color:var(--muted); }
+
+  /* lightbox */
+  #lightbox{
+    position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:rgba(2,1,3,.92); padding:20px; cursor:zoom-out;
+  }
+  #lightbox.show{ display:flex; }
+  #lightbox img{ max-width:100%; max-height:100%; border-radius:10px; box-shadow:0 0 40px rgba(165,104,255,.5); }
+
   @media (max-width:480px){
     .glass-card{ padding:24px 18px;}
     .radio-opt{min-width:100%;}
@@ -290,8 +347,26 @@
         <div id="rsvp-status"></div>
       </form>
     </div>
+
+    <!-- ===== Concurso de melhor fantasia ===== -->
+    <div class="glass-card" id="photo-card">
+      <h3 class="brush">📸 Melhor fantasia</h3>
+      <p class="sub">Mostre sua fantasia! Envie uma ou mais fotos para a votação de melhor fantasia da noite.</p>
+      <div class="privacy">🔒 Só você vê as fotos que enviar aqui. Pode apagar e subir outra quando quiser.</div>
+
+      <div id="photo-counter">0 de 5 fotos</div>
+
+      <label class="btn-upload" id="photo-upload-btn" for="photo-input">📷 ESCOLHER FOTOS</label>
+      <input type="file" id="photo-input" accept="image/*" multiple>
+
+      <div id="photo-status" class="info"></div>
+      <div id="photo-empty" style="display:none;">Você ainda não enviou nenhuma foto.</div>
+      <div id="photo-grid"></div>
+    </div>
   </div>
 </main>
+
+<div id="lightbox"><img alt="Foto ampliada"></div>
 
 <script>
   /* ====== CONFIG ======
@@ -430,6 +505,8 @@
       guestArea.classList.add('show');
       flashScreen(0.5);
       window.scrollTo({top:0, behavior:'smooth'});
+
+      carregarFotos();
     } else {
       gateError.style.display = 'block';
       gateCard.classList.remove('shake');
@@ -517,6 +594,182 @@
     submitBtn.textContent = 'SALVAR CONFIRMAÇÃO';
     rsvpStatus.className = 'err';
     rsvpStatus.textContent = (err && err.message) ? err.message : 'Algo deu errado. Tente novamente.';
+  }
+
+  /* =====================================================================
+     CONCURSO DE MELHOR FANTASIA — fotos
+     - cada convidado só vê/apaga as próprias fotos (o servidor confere
+       o telefone em toda chamada)
+     - a foto é reduzida aqui no navegador antes de enviar, pra subir
+       rápido mesmo no 4G da festa
+     ===================================================================== */
+  const photoInput = document.getElementById('photo-input');
+  const photoGrid = document.getElementById('photo-grid');
+  const photoEmpty = document.getElementById('photo-empty');
+  const photoCounter = document.getElementById('photo-counter');
+  const photoStatus = document.getElementById('photo-status');
+  const photoUploadBtn = document.getElementById('photo-upload-btn');
+  const lightbox = document.getElementById('lightbox');
+
+  let fotos = [];        // [{ id, dataUrl }]
+  let maxFotos = 5;      // o servidor confirma o limite real
+  let fotoOcupado = false;
+
+  function setPhotoStatus(texto, tipo){
+    photoStatus.textContent = texto || '';
+    photoStatus.className = tipo || 'info';
+  }
+
+  function renderFotos(){
+    photoGrid.innerHTML = '';
+    fotos.forEach(function(foto){
+      const item = document.createElement('div');
+      item.className = 'photo-item';
+      item.dataset.id = foto.id;
+
+      const img = document.createElement('img');
+      img.src = foto.dataUrl;
+      img.alt = 'Sua foto da fantasia';
+      img.addEventListener('click', function(){
+        lightbox.querySelector('img').src = foto.dataUrl;
+        lightbox.classList.add('show');
+      });
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'photo-del';
+      del.title = 'Apagar esta foto';
+      del.setAttribute('aria-label', 'Apagar esta foto');
+      del.textContent = '✕';
+      del.addEventListener('click', function(){ apagarFoto(foto.id, item); });
+
+      item.appendChild(img);
+      item.appendChild(del);
+      photoGrid.appendChild(item);
+    });
+
+    photoCounter.textContent = fotos.length + ' de ' + maxFotos + ' fotos';
+    photoEmpty.style.display = fotos.length ? 'none' : 'block';
+    const cheio = fotos.length >= maxFotos;
+    photoUploadBtn.classList.toggle('disabled', cheio || fotoOcupado);
+    photoInput.disabled = cheio || fotoOcupado;
+  }
+
+  lightbox.addEventListener('click', function(){ lightbox.classList.remove('show'); });
+
+  async function carregarFotos(){
+    setPhotoStatus('Carregando suas fotos...', 'info');
+    try {
+      const url = API_URL + '?action=fotos&telefone=' + encodeURIComponent(telefoneConvidado);
+      const resp = await fetch(url);
+      const res = await resp.json();
+      if(res && res.error) throw new Error(res.error);
+      fotos = res.fotos || [];
+      maxFotos = res.max || maxFotos;
+      renderFotos();
+      setPhotoStatus('', 'info');
+    } catch (err) {
+      renderFotos();
+      setPhotoStatus('Não deu pra carregar suas fotos agora. Recarregue a página para tentar de novo.', 'err');
+    }
+  }
+
+  /* reduz a foto (lado maior = 1280px) e converte para JPEG */
+  function redimensionar(file, maxLado, qualidade){
+    return new Promise(function(resolve, reject){
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function(){
+        const escala = Math.min(1, maxLado / Math.max(img.width, img.height));
+        const largura = Math.round(img.width * escala);
+        const altura = Math.round(img.height * escala);
+        const c = document.createElement('canvas');
+        c.width = largura; c.height = altura;
+        c.getContext('2d').drawImage(img, 0, 0, largura, altura);
+        URL.revokeObjectURL(url);
+        resolve(c.toDataURL('image/jpeg', qualidade));
+      };
+      img.onerror = function(){
+        URL.revokeObjectURL(url);
+        reject(new Error('Não consegui abrir uma das imagens. Tente outro arquivo (JPG ou PNG).'));
+      };
+      img.src = url;
+    });
+  }
+
+  photoInput.addEventListener('change', async function(){
+    const arquivos = Array.from(photoInput.files || []).filter(function(f){ return f.type.indexOf('image/') === 0; });
+    photoInput.value = '';
+    if(!arquivos.length || fotoOcupado) return;
+
+    const vagas = maxFotos - fotos.length;
+    if(vagas <= 0){
+      setPhotoStatus('Você já enviou o máximo de ' + maxFotos + ' fotos. Apague uma para enviar outra.', 'err');
+      return;
+    }
+    const selecionados = arquivos.slice(0, vagas);
+    const cortadas = arquivos.length - selecionados.length;
+
+    fotoOcupado = true;
+    renderFotos();
+
+    let enviadas = 0;
+    let erro = '';
+    for(let i = 0; i < selecionados.length; i++){
+      setPhotoStatus('Enviando foto ' + (i + 1) + ' de ' + selecionados.length + '...', 'info');
+      try {
+        const dataUrl = await redimensionar(selecionados[i], 1280, 0.82);
+        const resp = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ acao: 'enviarFoto', telefone: telefoneConvidado, imagem: dataUrl })
+        });
+        const res = await resp.json();
+        if(res && res.error) throw new Error(res.error);
+        fotos.push({ id: res.id, dataUrl: dataUrl });
+        enviadas++;
+        renderFotos();
+      } catch (err) {
+        erro = (err && err.message) ? err.message : 'Não deu pra enviar agora. Tente de novo.';
+        break;
+      }
+    }
+
+    fotoOcupado = false;
+    renderFotos();
+
+    if(erro){
+      setPhotoStatus((enviadas ? enviadas + ' foto(s) enviada(s). ' : '') + erro, 'err');
+    } else {
+      let msg = '✓ ' + enviadas + (enviadas === 1 ? ' foto enviada!' : ' fotos enviadas!');
+      if(cortadas > 0) msg += ' (O limite é ' + maxFotos + ' fotos, então ' + cortadas + ' ficou de fora.)';
+      setPhotoStatus(msg, 'ok');
+    }
+  });
+
+  async function apagarFoto(id, itemEl){
+    if(fotoOcupado) return;
+    if(!confirm('Apagar esta foto?')) return;
+
+    fotoOcupado = true;
+    itemEl.classList.add('busy');
+    setPhotoStatus('Apagando...', 'info');
+    try {
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ acao: 'apagarFoto', telefone: telefoneConvidado, id: id })
+      });
+      const res = await resp.json();
+      if(res && res.error) throw new Error(res.error);
+      fotos = fotos.filter(function(f){ return f.id !== id; });
+      setPhotoStatus('Foto apagada. Você pode enviar outra.', 'ok');
+    } catch (err) {
+      itemEl.classList.remove('busy');
+      setPhotoStatus((err && err.message) ? err.message : 'Não deu pra apagar agora. Tente de novo.', 'err');
+    }
+    fotoOcupado = false;
+    renderFotos();
   }
 </script>
 
